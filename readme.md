@@ -202,6 +202,116 @@ curl http://localhost:8090/api/collections/players/records \
   -H "Authorization: TOKEN_FROM_RESPONSE"
 ```
 
+## C# Example (S&Box)
+
+On the s&box side, request an auth token in-game, exchange it for a PocketBase
+token, and reuse that token for all subsequent requests.
+
+```csharp
+using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+using Sandbox;
+
+public static class PocketBaseClient
+{
+	// Base URL of your PocketBase server.
+	const string BaseUrl = "https://your-pb.com";
+
+	// The service name must match what you registered with Facepunch.
+	const string ServiceName = "YourServiceName";
+
+	// The PocketBase auth token, cached after a successful login.
+	public static string AuthToken { get; private set; }
+
+	// --- request/response DTOs ---------------------------------------------
+
+	class AuthRequest
+	{
+		[JsonPropertyName("steamid")] public string SteamId { get; set; }
+		[JsonPropertyName("token")] public string Token { get; set; }
+		[JsonPropertyName("display_name")] public string DisplayName { get; set; }
+	}
+
+	class AuthResponse
+	{
+		[JsonPropertyName("token")] public string Token { get; set; }
+		[JsonPropertyName("record")] public PlayerRecord Record { get; set; }
+	}
+
+	public class PlayerRecord
+	{
+		[JsonPropertyName("id")] public string Id { get; set; }
+		[JsonPropertyName("steam_id")] public string SteamId { get; set; }
+		[JsonPropertyName("display_name")] public string DisplayName { get; set; }
+	}
+
+	// --- login -------------------------------------------------------------
+
+	/// <summary>
+	/// Verifies the player with the backend and caches a PocketBase token.
+	/// Returns the player's record on success.
+	/// </summary>
+	public static async Task<PlayerRecord> Login()
+	{
+		// 1. Ask Facepunch for a fresh auth token for this player.
+		var token = await Sandbox.Services.Auth.GetToken( ServiceName );
+
+		// 2. Exchange it for a PocketBase auth token.
+		var payload = new AuthRequest
+		{
+			SteamId = Game.SteamId.ToString(),
+			Token = token,
+			DisplayName = Steam.PersonaName,
+		};
+
+		var response = await Http.RequestJsonAsync<AuthResponse>(
+			$"{BaseUrl}/api/sbox-auth",
+			"POST",
+			content: new StringContent(
+				JsonSerializer.Serialize( payload ),
+				System.Text.Encoding.UTF8,
+				"application/json" )
+		);
+
+		AuthToken = response.Token;
+		Log.Info( $"Logged in as {response.Record.DisplayName}" );
+		return response.Record;
+	}
+
+	// --- authenticated requests -------------------------------------------
+
+	/// <summary>
+	/// Example: fetch a record from a data collection using the cached token.
+	/// </summary>
+	public static async Task<T> Get<T>( string path )
+	{
+		if ( string.IsNullOrEmpty( AuthToken ) )
+			throw new Exception( "Not logged in — call Login() first." );
+
+		using var http = new Http( new Uri( $"{BaseUrl}{path}" ) );
+		http.SetHeader( "Authorization", AuthToken );
+		return await http.GetJsonAsync<T>();
+	}
+}
+```
+
+PocketBaseClient Usage
+
+```csharp
+var player = await PocketBaseClient.Login();
+Log.Info( $"Welcome back, {player.DisplayName}!" );
+
+// Later, make authenticated calls with the cached token:
+var state = await PocketBaseClient.Get<PlayerState>(
+	$"/api/collections/player_state/records/{player.Id}" );
+```
+
+The PocketBase token is a normal JWT with an expiry. When it lapses, just call
+Login() again — generating a fresh Facepunch token in-game is cheap, so a
+full refresh-token flow is usually unnecessary.
+
 ## License
 
 MIT
