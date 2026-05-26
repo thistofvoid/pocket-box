@@ -270,14 +270,12 @@ func (p *Plugin) handleAuth(app core.App) func(*core.RequestEvent) error {
 			return e.BadRequestError("invalid steamid", nil)
 		}
 
-		// 1. Verify with Facepunch.
 		if err := p.verifier.Verify(e.Request.Context(), steamID, body.Token); err != nil {
 			app.Logger().Warn("sboxauth: verification failed",
 				"steamid", steamID, "err", err.Error())
 			return e.UnauthorizedError("token verification failed", nil)
 		}
 
-		// 2. Find or create the player's auth record.
 		collection, err := e.App.FindCollectionByNameOrId(p.opts.CollectionName)
 		if err != nil {
 			return e.InternalServerError("players collection missing", err)
@@ -314,7 +312,6 @@ func (p *Plugin) handleAuth(app core.App) func(*core.RequestEvent) error {
 			}
 		}
 
-		// 3. Issue a standard PocketBase auth token + record payload.
 		return apis.RecordAuthResponse(e, record, p.opts.ServiceName, nil)
 	}
 }
