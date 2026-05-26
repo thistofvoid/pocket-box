@@ -16,7 +16,7 @@ It registers a custom auth endpoint that verifies an s&box auth token against th
 ## Installation
 
 ```sh
-go get yourmodule/pocketbox
+go get github.com/thistofvoid/pocketbox
 ```
 
 This library is used alongside PocketBase as a Go framework:
@@ -34,7 +34,7 @@ import (
 	"log"
 
 	"github.com/pocketbase/pocketbase"
-	"yourmodule/pocketbox"
+	"thistofvoid/pocketbox"
 )
 
 func main() {
