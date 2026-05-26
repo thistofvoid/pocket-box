@@ -1,4 +1,4 @@
-module pocketbox
+module thistofvoid/pocketbox
 
 go 1.25.0
 
